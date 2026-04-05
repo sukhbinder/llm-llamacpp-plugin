@@ -1,0 +1,30 @@
+[project]
+name = "llm-llamacpp-plugin"
+version = "0.1"
+description = "LLM plugin providing access to llama.cpp server models"
+readme = "README.md"
+authors = [{name = "Sukhbinder Singh"}]
+license = {text = "Apache-2.0"}
+classifiers = [
+    "License :: OSI Approved :: Apache Software License"
+]
+dependencies = [
+    "llm>=0.26",
+    "httpx",
+    "httpx-sse",
+]
+
+[project.urls]
+Homepage = "https://github.com/sukhbinder/llm-llamacpp"
+Changelog = "https://github.com/sukhbinder/llm-llamacpp/releases"
+Issues = "https://github.com/sukhbinder/llm-llamacpp/issues"
+
+[project.entry-points.llm]
+llamacpp = "llm_llamacpp_plugin"
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-httpx", "pytest-asyncio"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"

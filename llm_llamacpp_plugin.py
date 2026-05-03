@@ -83,12 +83,16 @@ def register_models(register):
         AsyncLlamaCpp(),
     )
     register(
-        LlamaCppVision(vision=True),
-        AsyncLlamaCppVision(vision=True),
+        LlamaCppVision(supports_schema=True, vision=True),
+        AsyncLlamaCppVision(supports_schema=True, vision=True),
     )
     register(
-        LlamaCppTools(vision=True, can_stream=False, supports_tools=True),
-        AsyncLlamaCppTools(vision=True, can_stream=False, supports_tools=True),
+        LlamaCppTools(
+            vision=True, supports_schema=True, can_stream=False, supports_tools=True
+        ),
+        AsyncLlamaCppTools(
+            vision=True, supports_schema=True, can_stream=False, supports_tools=True
+        ),
     )
 
 

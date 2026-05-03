@@ -107,7 +107,9 @@ def test_llamacpp_embed_batch_success(mock_httpx_client):
     mock_response.json.return_value = {
         "data": [{"embedding": [0.1, 0.2]}, {"embedding": [0.3, 0.4]}]
     }
-    mock_httpx_client.return_value.__enter__.return_value.post.return_value = mock_response
+    mock_httpx_client.return_value.__enter__.return_value.post.return_value = (
+        mock_response
+    )
 
     embedder = LlamaCppEmbed()
     texts = ["hello world", "goodbye world"]
@@ -129,9 +131,13 @@ def test_llamacpp_embed_batch_http_error(mock_httpx_client):
     mock_response.status_code = 400
     mock_response.text = "Bad Request"
     mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
-        "Bad Request", request=httpx.Request("POST", "http://test"), response=mock_response
+        "Bad Request",
+        request=httpx.Request("POST", "http://test"),
+        response=mock_response,
     )
-    mock_httpx_client.return_value.__enter__.return_value.post.return_value = mock_response
+    mock_httpx_client.return_value.__enter__.return_value.post.return_value = (
+        mock_response
+    )
 
     embedder = LlamaCppEmbed()
     texts = ["error text"]
@@ -150,7 +156,9 @@ def test_llamacpp_embed_batch_text_truncation(mock_httpx_client):
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {"data": [{"embedding": [0.5, 0.6]}]}
-    mock_httpx_client.return_value.__enter__.return_value.post.return_value = mock_response
+    mock_httpx_client.return_value.__enter__.return_value.post.return_value = (
+        mock_response
+    )
 
     embedder = LlamaCppEmbed(model_id="test-embed", model_name="test-model")
     embedder.max_text_length = 10
@@ -160,6 +168,8 @@ def test_llamacpp_embed_batch_text_truncation(mock_httpx_client):
     embedder.embed_batch(texts)
 
     mock_httpx_client.return_value.__enter__.return_value.post.assert_called_once()
-    called_json = mock_httpx_client.return_value.__enter__.return_value.post.call_args[1]["json"]
+    called_json = mock_httpx_client.return_value.__enter__.return_value.post.call_args[
+        1
+    ]["json"]
     assert called_json["input"] == [expected_truncated_text]
     assert called_json["model"] == "test-model"

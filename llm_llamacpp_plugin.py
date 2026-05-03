@@ -2,8 +2,6 @@ import llm
 from llm.default_plugins.openai_models import Chat, AsyncChat
 import click
 import httpx
-from pydantic import Field
-from llm.models import Options as BaseModelOptions
 
 DEFAULT_SERVER_URL = "http://localhost:8080"
 

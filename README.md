@@ -59,38 +59,21 @@ llm -m llamacpp "First message"
 llm -c "Follow-up question"
 ```
 
-### Options
-
-The plugin supports various generation options:
-
-```bash
-# Set temperature
-llm -m llamacpp "Your prompt" --temperature 0.9
-
-# Limit max tokens
-llm -m llamacpp "Your prompt" --max-tokens 500
-
-# Set top-p sampling
-llm -m llamacpp "Your prompt" --top-p 0.9
-
-# Use a specific seed for reproducible results
-llm -m llamacpp "Your prompt" --seed 42
-
-# Adjust repeat penalty
-llm -m llamacpp "Your prompt" --repeat-penalty 1.2
-```
-
 ### JSON Schema
 
 You can request JSON output using LLM's schema feature:
 
 ```bash
-llm -m llamacpp "Generate a person" --schema '{"name": "string", "age": "integer"}'
+llm -m llamacpp-tools "Generate a person" --schema '{"name": "string", "age": "integer"}'
 ```
 
 ### Vision Models
 
 If you're running a vision-capable llama.cpp model with multimodal support, the plugin can handle image attachments.
+
+```bash
+llm -m llamacpp-vision -a /tmp/screen.png "What is the user doing in this screenshot"
+```
 
 ### Embedding Models
 

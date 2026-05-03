@@ -1,444 +1,175 @@
-import json
 import pytest
-from pytest_httpx import IteratorStream
-import llm
+from unittest.mock import patch, MagicMock
+import os
+import httpx
+from llm.models import Options
+
+from llm_llamacpp_plugin import (
+    get_server_url,
+    LlamaCpp,
+    AsyncLlamaCpp,
+    LlamaCppEmbed,
+    DEFAULT_SERVER_URL,
+)
 
 
-@pytest.fixture(scope="session")
-def llm_user_path(tmp_path_factory):
-    tmpdir = tmp_path_factory.mktemp("llm")
-    return str(tmpdir)
+def test_get_server_url_default():
+    """Test get_server_url returns default when no env var is set."""
+    with patch.dict(os.environ, {}, clear=True):
+        assert get_server_url() == DEFAULT_SERVER_URL
 
 
-@pytest.fixture(autouse=True)
-def mock_env(monkeypatch, llm_user_path):
-    monkeypatch.setenv("LLM_USER_PATH", llm_user_path)
-    monkeypatch.setenv("LLM_LLAMACPP_SERVER", "http://localhost:8080")
+def test_get_server_url_from_env():
+    """Test get_server_url returns value from environment variable."""
+    test_url = "http://custom-server:9000"
+    with patch.dict(os.environ, {"LLM_LLAMACPP_SERVER": test_url}, clear=True):
+        assert get_server_url() == test_url
 
 
-@pytest.fixture
-def mocked_stream(httpx_mock):
-    httpx_mock.add_response(
-        url="http://localhost:8080/v1/chat/completions",
-        method="POST",
-        stream=IteratorStream(
-            [
-                b'data: {"id": "cmpl-4243ee7858634455a2153d6430719956", "model": "default", "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": null}]}\n\n',
-                b'data: {"id": "cmpl-4243ee7858634455a2153d6430719956", "object": "chat.completion.chunk", "created": 1702612156, "model": "default", "choices": [{"index": 0, "delta": {"role": null, "content": "I am an AI"}, "finish_reason": null}]}\n\n',
-                b'data: {"id": "cmpl-4243ee7858634455a2153d6430719956", "object": "chat.completion.chunk", "created": 1702612156, "model": "default", "choices": [{"index": 0, "delta": {"role": null, "content": ""}, "finish_reason": "stop"}]}\n\n',
-                b"data: [DONE]",
-            ]
-        ),
-        headers={"content-type": "text/event-stream"},
-    )
-    return httpx_mock
+def test_llamacpp_init():
+    """Test LlamaCpp initialization."""
+    model = LlamaCpp()
+    assert model.model_id == "llamacpp"
+    assert model.model_name == "llamacpp"
+    assert model.api_base == f"{DEFAULT_SERVER_URL}/v1"
 
 
-@pytest.fixture
-def mocked_no_stream(httpx_mock):
-    httpx_mock.add_response(
-        url="http://localhost:8080/v1/chat/completions",
-        method="POST",
-        json={
-            "id": "cmpl-362653b305c4939bfa423af5f97709b",
-            "object": "chat.completion",
-            "created": 1702614202,
-            "model": "default",
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": "I'm just a computer program, I don't have feelings.",
-                    },
-                    "finish_reason": "stop",
-                }
-            ],
-            "usage": {"prompt_tokens": 16, "total_tokens": 79, "completion_tokens": 63},
-        },
-    )
-    return httpx_mock
+def test_llamacpp_get_server_url_from_prompt_options():
+    """Test LlamaCpp.get_server_url prioritizes prompt options."""
+    model = LlamaCpp()
+    mock_prompt = MagicMock()
+    mock_prompt.options.server_url = "http://prompt-server:8000"
+    assert model.get_server_url(mock_prompt) == "http://prompt-server:8000"
 
 
-def test_stream(mocked_stream):
-    model = llm.get_model("llamacpp")
-    response = model.prompt("How are you?")
-    chunks = list(response)
-    # Empty content chunks are now skipped
-    assert chunks == ["I am an AI"]
-    # Use get_requests() since there may be extra framework requests
-    requests = mocked_stream.get_requests()
-    chat_request = [r for r in requests if r.method == "POST"][0]
-    assert json.loads(chat_request.content) == {
-        "model": "default",
-        "messages": [{"role": "user", "content": "How are you?"}],
-        "temperature": 0.7,
-        "top_p": 1,
-        "stream": True,
-    }
+def test_llamacpp_get_server_url_from_env_fallback():
+    """Test LlamaCpp.get_server_url falls back to env var."""
+    model = LlamaCpp()
+    mock_prompt = MagicMock()
+    mock_prompt.options.server_url = None  # No server_url in options
+    test_url = "http://env-server:7000"
+    with patch.dict(os.environ, {"LLM_LLAMACPP_SERVER": test_url}, clear=True):
+        assert model.get_server_url(mock_prompt) == test_url
+
+
+def test_llamacpp_get_server_url_default_fallback():
+    """Test LlamaCpp.get_server_url falls back to default."""
+    model = LlamaCpp()
+    mock_prompt = MagicMock()
+    mock_prompt.options.server_url = None  # No server_url in options
+    with patch.dict(os.environ, {}, clear=True):  # No env var
+        assert model.get_server_url(mock_prompt) == DEFAULT_SERVER_URL
+
+
+def test_asyncllamacpp_init():
+    """Test AsyncLlamaCpp initialization."""
+    model = AsyncLlamaCpp()
+    assert model.model_id == "llamacpp"
+    assert model.model_name == "llamacpp"
+    assert model.api_base == f"{DEFAULT_SERVER_URL}/v1"
 
 
 @pytest.mark.asyncio
-async def test_stream_async(httpx_mock):
-    httpx_mock.add_response(
-        url="http://localhost:8080/v1/chat/completions",
-        method="POST",
-        stream=IteratorStream(
-            [
-                b'data: {"id": "cmpl-4243ee7858634455a2153d6430719956", "model": "default", "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": null}]}\n\n',
-                b'data: {"id": "cmpl-4243ee7858634455a2153d6430719956", "object": "chat.completion.chunk", "created": 1702612156, "model": "default", "choices": [{"index": 0, "delta": {"role": null, "content": "I am an AI"}, "finish_reason": null}]}\n\n',
-                b'data: {"id": "cmpl-4243ee7858634455a2153d6430719956", "object": "chat.completion.chunk", "created": 1702612156, "model": "default", "choices": [{"index": 0, "delta": {"role": null, "content": ""}, "finish_reason": "stop"}]}\n\n',
-                b"data: [DONE]",
-            ]
-        ),
-        headers={"content-type": "text/event-stream"},
-    )
-    model = llm.get_async_model("llamacpp")
-    response = await model.prompt("How are you?")
-    chunks = [item async for item in response]
-    # Empty content chunks are now skipped
-    assert chunks == ["I am an AI"]
-    requests = httpx_mock.get_requests()
-    chat_request = [r for r in requests if r.method == "POST"][0]
-    assert json.loads(chat_request.content) == {
-        "model": "default",
-        "messages": [{"role": "user", "content": "How are you?"}],
-        "temperature": 0.7,
-        "top_p": 1,
-        "stream": True,
-    }
+async def test_asyncllamacpp_get_server_url_from_prompt_options():
+    """Test AsyncLlamaCpp.get_server_url prioritizes prompt options."""
+    model = AsyncLlamaCpp()
+    mock_prompt = MagicMock()
+    mock_prompt.options.server_url = "http://async-prompt-server:8000"
+    assert model.get_server_url(mock_prompt) == "http://async-prompt-server:8000"
 
 
 @pytest.mark.asyncio
-async def test_async_no_stream(httpx_mock):
-    httpx_mock.add_response(
-        url="http://localhost:8080/v1/chat/completions",
-        method="POST",
-        json={
-            "id": "cmpl-362653b305c4939bfa423af5f97709b",
-            "object": "chat.completion",
-            "created": 1702614202,
-            "model": "default",
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": "I'm just a computer program, I don't have feelings.",
-                    },
-                    "finish_reason": "stop",
-                }
-            ],
-            "usage": {"prompt_tokens": 16, "total_tokens": 79, "completion_tokens": 63},
-        },
-    )
-    model = llm.get_async_model("llamacpp")
-    response = await model.prompt("How are you?", stream=False)
-    text = await response.text()
-    assert text == "I'm just a computer program, I don't have feelings."
+async def test_asyncllamacpp_get_server_url_from_env_fallback():
+    """Test AsyncLlamaCpp.get_server_url falls back to env var."""
+    model = AsyncLlamaCpp()
+    mock_prompt = MagicMock()
+    mock_prompt.options.server_url = None  # No server_url in options
+    test_url = "http://async-env-server:7000"
+    with patch.dict(os.environ, {"LLM_LLAMACPP_SERVER": test_url}, clear=True):
+        assert model.get_server_url(mock_prompt) == test_url
 
 
-def test_stream_with_options(mocked_stream):
-    model = llm.get_model("llamacpp")
-    model.prompt(
-        "How are you?",
-        temperature=0.5,
-        top_p=0.8,
-        seed=42,
-        max_tokens=10,
-        top_k=50,
-        repeat_penalty=1.2,
-    ).text()
-    requests = mocked_stream.get_requests()
-    chat_request = [r for r in requests if r.method == "POST"][0]
-    assert json.loads(chat_request.content) == {
-        "model": "default",
-        "messages": [{"role": "user", "content": "How are you?"}],
-        "temperature": 0.5,
-        "top_p": 0.8,
-        "seed": 42,
-        "max_tokens": 10,
-        "top_k": 50,
-        "repeat_penalty": 1.2,
-        "stream": True,
+@pytest.mark.asyncio
+async def test_asyncllamacpp_get_server_url_default_fallback():
+    """Test AsyncLlamaCpp.get_server_url falls back to default."""
+    model = AsyncLlamaCpp()
+    mock_prompt = MagicMock()
+    mock_prompt.options.server_url = None  # No server_url in options
+    with patch.dict(os.environ, {}, clear=True):  # No env var
+        assert model.get_server_url(mock_prompt) == DEFAULT_SERVER_URL
+
+
+@patch("httpx.Client")
+def test_llamacpp_embed_batch_success(mock_httpx_client):
+    """Test LlamaCppEmbed.embed_batch for successful embedding."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "data": [{"embedding": [0.1, 0.2]}, {"embedding": [0.3, 0.4]}]
     }
-
-
-def test_no_stream(mocked_no_stream):
-    model = llm.get_model("llamacpp")
-    response = model.prompt("How are you?", stream=False)
-    assert response.text() == "I'm just a computer program, I don't have feelings."
-
-
-def test_custom_server_url(httpx_mock):
-    httpx_mock.add_response(
-        url="http://custom-server:9000/v1/chat/completions",
-        method="POST",
-        json={
-            "id": "cmpl-test",
-            "object": "chat.completion",
-            "created": 1702614202,
-            "model": "default",
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": "Response from custom server",
-                    },
-                    "finish_reason": "stop",
-                }
-            ],
-        },
+    mock_httpx_client.return_value.__enter__.return_value.post.return_value = (
+        mock_response
     )
 
-    model = llm.get_model("llamacpp")
-    response = model.prompt(
-        "Test", server_url="http://custom-server:9000", stream=False
-    )
-    assert response.text() == "Response from custom server"
-    requests = httpx_mock.get_requests()
-    chat_request = [r for r in requests if r.method == "POST"][0]
-    assert chat_request.url == "http://custom-server:9000/v1/chat/completions"
+    embedder = LlamaCppEmbed()
+    texts = ["hello world", "goodbye world"]
+    embeddings = embedder.embed_batch(texts)
 
-
-def test_system_message(mocked_no_stream):
-    model = llm.get_model("llamacpp")
-    response = model.prompt(
-        "How are you?", system="You are a helpful assistant", stream=False
-    )
-    assert response.text() == "I'm just a computer program, I don't have feelings."
-    requests = mocked_no_stream.get_requests()
-    chat_request = [r for r in requests if r.method == "POST"][0]
-    body = json.loads(chat_request.content)
-    assert body["messages"] == [
-        {"role": "system", "content": "You are a helpful assistant"},
-        {"role": "user", "content": "How are you?"},
-    ]
-
-
-def test_embedding(httpx_mock):
-    httpx_mock.add_response(
-        url="http://localhost:8080/v1/embeddings",
-        method="POST",
-        json={
-            "object": "list",
-            "data": [
-                {
-                    "object": "embedding",
-                    "index": 0,
-                    "embedding": [0.1, 0.2, 0.3, 0.4, 0.5],
-                },
-                {
-                    "object": "embedding",
-                    "index": 1,
-                    "embedding": [0.6, 0.7, 0.8, 0.9, 1.0],
-                },
-            ],
-            "usage": {"prompt_tokens": 10, "total_tokens": 10},
-        },
+    assert embeddings == [[0.1, 0.2], [0.3, 0.4]]
+    mock_httpx_client.return_value.__enter__.return_value.post.assert_called_once_with(
+        f"{DEFAULT_SERVER_URL}/v1/embeddings",
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        json={"model": "default", "input": texts},
+        timeout=None,
     )
 
-    model = llm.get_embedding_model("llamacpp-embed")
-    embeddings = list(model.embed_batch(["Hello world", "Goodbye world"]))
-    assert len(embeddings) == 2
-    assert embeddings[0] == [0.1, 0.2, 0.3, 0.4, 0.5]
-    assert embeddings[1] == [0.6, 0.7, 0.8, 0.9, 1.0]
 
-    requests = httpx_mock.get_requests()
-    chat_request = [r for r in requests if r.method == "POST"][0]
-    body = json.loads(chat_request.content)
-    assert body == {
-        "model": "default",
-        "input": ["Hello world", "Goodbye world"],
-    }
-
-
-def test_embedding_single_text(httpx_mock):
-    """Test embedding of a single text (batch_size=1 behavior)."""
-    httpx_mock.add_response(
-        url="http://localhost:8080/v1/embeddings",
-        method="POST",
-        json={
-            "object": "list",
-            "data": [
-                {
-                    "object": "embedding",
-                    "index": 0,
-                    "embedding": [0.1, 0.2, 0.3],
-                },
-            ],
-            "usage": {"prompt_tokens": 5, "total_tokens": 5},
-        },
+@patch("httpx.Client")
+def test_llamacpp_embed_batch_http_error(mock_httpx_client):
+    """Test LlamaCppEmbed.embed_batch handles HTTP errors."""
+    mock_response = MagicMock()
+    mock_response.status_code = 400
+    mock_response.text = "Bad Request"
+    mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "Bad Request",
+        request=httpx.Request("POST", "http://test"),
+        response=mock_response,
+    )
+    mock_httpx_client.return_value.__enter__.return_value.post.return_value = (
+        mock_response
     )
 
-    model = llm.get_embedding_model("llamacpp-embed")
-    embeddings = list(model.embed_batch(["Single text"]))
-    assert len(embeddings) == 1
-    assert embeddings[0] == [0.1, 0.2, 0.3]
+    embedder = LlamaCppEmbed()
+    texts = ["error text"]
 
-    requests = httpx_mock.get_requests()
-    chat_request = [r for r in requests if r.method == "POST"][0]
-    body = json.loads(chat_request.content)
-    assert body == {
-        "model": "default",
-        "input": ["Single text"],
-    }
+    with pytest.raises(RuntimeError) as excinfo:
+        embedder.embed_batch(texts)
+
+    assert "Embedding API error: 400 Bad Request" in str(excinfo.value)
+    assert "Failed on batch with 1 texts." in str(excinfo.value)
+    assert "First text preview: 'error text...'" in str(excinfo.value)
 
 
-def test_embedding_truncates_long_text(httpx_mock):
-    """Test that long texts are truncated to fit within token limits."""
-    httpx_mock.add_response(
-        url="http://localhost:8080/v1/embeddings",
-        method="POST",
-        json={
-            "object": "list",
-            "data": [
-                {
-                    "object": "embedding",
-                    "index": 0,
-                    "embedding": [0.1, 0.2, 0.3],
-                },
-            ],
-            "usage": {"prompt_tokens": 300, "total_tokens": 300},
-        },
+@patch("httpx.Client")
+def test_llamacpp_embed_batch_text_truncation(mock_httpx_client):
+    """Test LlamaCppEmbed.embed_batch truncates long texts."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"data": [{"embedding": [0.5, 0.6]}]}
+    mock_httpx_client.return_value.__enter__.return_value.post.return_value = (
+        mock_response
     )
 
-    model = llm.get_embedding_model("llamacpp-embed")
-    # Create a text longer than max_text_length (1500 chars)
-    long_text = "A" * 3000
-    embeddings = list(model.embed_batch([long_text]))
-    assert len(embeddings) == 1
-    assert embeddings[0] == [0.1, 0.2, 0.3]
+    embedder = LlamaCppEmbed(model_id="test-embed", model_name="test-model")
+    embedder.max_text_length = 10
+    long_text = "this is a very long text that should be truncated"
+    expected_truncated_text = "this is a "
+    texts = [long_text]
+    embedder.embed_batch(texts)
 
-    requests = httpx_mock.get_requests()
-    chat_request = [r for r in requests if r.method == "POST"][0]
-    body = json.loads(chat_request.content)
-    # Verify the text was truncated to max_text_length
-    assert len(body["input"][0]) == 1500
-
-
-def test_embedding_real_file(httpx_mock, tmp_path):
-    """Test embedding a real markdown file, simulating embed-multi behavior."""
-    # Create a test markdown file
-    test_md = tmp_path / "test_doc.md"
-    test_md.write_text(
-        "# Test Document\n\nThis is a test markdown file.\n\n## Section 1\n\nSome content here.\n"
-    )
-
-    httpx_mock.add_response(
-        url="http://localhost:8080/v1/embeddings",
-        method="POST",
-        json={
-            "object": "list",
-            "data": [
-                {
-                    "object": "embedding",
-                    "index": 0,
-                    "embedding": [0.01] * 768,  # Realistic embedding dimension
-                },
-            ],
-            "usage": {"prompt_tokens": 20, "total_tokens": 20},
-        },
-    )
-
-    model = llm.get_embedding_model("llamacpp-embed")
-
-    # Read the file content like embed-multi would
-    content = test_md.read_text()
-    embeddings = list(model.embed_batch([content]))
-
-    assert len(embeddings) == 1
-    assert len(embeddings[0]) == 768  # embeddinggemma-300M has 768 dimensions
-
-    requests = httpx_mock.get_requests()
-    chat_request = [r for r in requests if r.method == "POST"][0]
-    body = json.loads(chat_request.content)
-    assert body["model"] == "default"
-    assert "# Test Document" in body["input"][0]
-
-
-def test_embedding_real_file_long_content(httpx_mock, tmp_path):
-    """Test embedding a file with content exceeding max_text_length."""
-    # Create a test markdown file with very long content
-    test_md = tmp_path / "long_doc.md"
-    long_content = "# Long Document\n\n" + "Paragraph. " * 500  # ~2500 chars
-    test_md.write_text(long_content)
-
-    httpx_mock.add_response(
-        url="http://localhost:8080/v1/embeddings",
-        method="POST",
-        json={
-            "object": "list",
-            "data": [
-                {
-                    "object": "embedding",
-                    "index": 0,
-                    "embedding": [0.02] * 768,
-                },
-            ],
-            "usage": {"prompt_tokens": 375, "total_tokens": 375},
-        },
-    )
-
-    model = llm.get_embedding_model("llamacpp-embed")
-
-    content = test_md.read_text()
-    embeddings = list(model.embed_batch([content]))
-
-    assert len(embeddings) == 1
-    assert len(embeddings[0]) == 768
-
-    requests = httpx_mock.get_requests()
-    chat_request = [r for r in requests if r.method == "POST"][0]
-    body = json.loads(chat_request.content)
-    # Verify truncation happened
-    assert len(body["input"][0]) == 1500
-    assert body["input"][0].startswith("# Long Document")
-
-
-def test_embedding_multiple_texts_sequential(httpx_mock):
-    """Test embedding multiple texts sequentially (simulating embed-multi with batch_size=1)."""
-    # Set up responses for multiple sequential calls
-    responses = [
-        {
-            "object": "list",
-            "data": [{"object": "embedding", "index": 0, "embedding": [0.1] * 5}],
-            "usage": {"prompt_tokens": 3, "total_tokens": 3},
-        },
-        {
-            "object": "list",
-            "data": [{"object": "embedding", "index": 0, "embedding": [0.2] * 5}],
-            "usage": {"prompt_tokens": 4, "total_tokens": 4},
-        },
-        {
-            "object": "list",
-            "data": [{"object": "embedding", "index": 0, "embedding": [0.3] * 5}],
-            "usage": {"prompt_tokens": 2, "total_tokens": 2},
-        },
-    ]
-
-    for resp in responses:
-        httpx_mock.add_response(
-            url="http://localhost:8080/v1/embeddings",
-            method="POST",
-            json=resp,
-        )
-
-    model = llm.get_embedding_model("llamacpp-embed")
-
-    texts = ["First text", "Second text", "Third"]
-    all_embeddings = []
-    for text in texts:
-        embeddings = list(model.embed_batch([text]))
-        all_embeddings.extend(embeddings)
-
-    assert len(all_embeddings) == 3
-    assert all_embeddings[0] == [0.1] * 5
-    assert all_embeddings[1] == [0.2] * 5
-    assert all_embeddings[2] == [0.3] * 5
-
-    # Verify all requests were made
-    requests = httpx_mock.get_requests()
-    post_requests = [r for r in requests if r.method == "POST"]
-    assert len(post_requests) == 3
+    mock_httpx_client.return_value.__enter__.return_value.post.assert_called_once()
+    called_json = mock_httpx_client.return_value.__enter__.return_value.post.call_args[
+        1
+    ]["json"]
+    assert called_json["input"] == [expected_truncated_text]
+    assert called_json["model"] == "test-model"

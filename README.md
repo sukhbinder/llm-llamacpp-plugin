@@ -29,7 +29,7 @@ cd llama.cpp
 make
 
 # Start the server with your model
-./build/bin/server -m models/your-model.gguf -c 4096
+./llama-server -m models/your-model.gguf -c 4096
 ```
 
 The server will start on `http://localhost:8080` by default.
@@ -42,12 +42,20 @@ Once the plugin is installed and your llama.cpp server is running, you can use i
 llm -m llamacpp "Your prompt here"
 ```
 
+![llamacpp demo](https://raw.githubusercontent.com/sukhbinder/llm-llamacpp-plugin/refs/heads/main/llamacpp-cli-help-lossless-o3.gif)
+
 ### Using a different server URL
 
 If your llama.cpp server is running on a different host or port, you can set the `LLM_LLAMACPP_SERVER` environment variable:
 
 ```bash
 export LLM_LLAMACPP_SERVER=http://your-server:port
+```
+
+in windows
+
+```cmd
+setx LLM_LLAMACPP_SERVER http://your-server:port
 ```
 
 ### Conversations
@@ -81,7 +89,7 @@ The plugin also supports embedding models running on llama.cpp server. To use em
 
 ```bash
 # Start the server with embedding support
-./build/bin/server -m models/embedding-model.gguf --embedding
+./llama-server -m models/embedding-model.gguf --embedding
 ```
 
 Then use it with LLM:

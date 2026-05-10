@@ -18,6 +18,7 @@ class LlamaCpp(Chat):
     key = "sk-llamacpp"
 
     def __init__(self, **kwargs):
+        self.needs_key = None
         super().__init__(
             model_name="llamacpp",
             model_id=self.model_id,
@@ -38,9 +39,9 @@ class LlamaCpp(Chat):
 class AsyncLlamaCpp(AsyncChat):
     model_id = "llamacpp"
     key = "sk-llamacpp"
-    needs_key = None
 
     def __init__(self, **kwargs):
+        self.needs_key = None
         super().__init__(
             model_name="llamacpp",
             model_id=self.model_id,

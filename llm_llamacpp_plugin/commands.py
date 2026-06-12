@@ -124,8 +124,9 @@ def status():
     # Show current model
     current = asyncio.get_event_loop().run_until_complete(manager.get_current_model())
     if current:
+        live_status = asyncio.get_event_loop().run_until_complete(current.get_status(manager.server_url))
         click.echo(f"\nCurrent model: {current.name} ({current.id})")
-        click.echo(f"Status: {current.status.value}")
+        click.echo(f"Status: {live_status.value}")
     else:
         click.echo("\nNo models currently loaded")
 
@@ -136,8 +137,8 @@ def status():
         click.echo("   (no models discovered)")
     else:
         for model in models:
-            status = model.get_label()
-            click.echo(f"  {status}")
+            live_status = asyncio.get_event_loop().run_until_complete(model.get_status(manager.server_url))
+            click.echo(f"  [{live_status.value}] {model.name}")
 
 
 @llamacpp.command()

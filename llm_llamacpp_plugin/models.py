@@ -58,7 +58,7 @@ class ServerModel:
         self.is_loaded = False
 
         try:
-            async with httpz.AsyncClient() as client:
+            async with httpx.AsyncClient() as client:
                 response = await client.post(
                     f"{server_url}/models/load", json={"model": self.id}, timeout=30.0
                 )
@@ -131,6 +131,12 @@ class ServerModel:
                 elif response.status_code == 503:
                     return ModelStatus.LOADING
                 elif response.status_code == 400:
+                    try:
+                        error_data = response.json()
+                        if error_data.get("error", {}).get("message") == "model is already running":
+                            return ModelStatus.LOADED
+                    except json.JSONDecodeError:
+                        pass
                     return ModelStatus.UNLOADED
 
                 # Fallback to /models endpoint
@@ -149,7 +155,7 @@ class ServerModel:
                                 return ModelStatus.FAILED
                             elif model_status == "sleeping":
                                 return ModelStatus.SLEEPING
-                            elif model.status == "unloaded":
+                            elif model_status == "unloaded":
                                 return ModelStatus.UNLOADED
 
                 return ModelStatus.FAILED
@@ -158,13 +164,13 @@ class ServerModel:
             self.last_error = str(e)
             return ModelStatus.FAILED
 
-    async def _poll_status(
+    async def poll_status(
         self, server_url: str, timeout: int = 60, interval: float = 0.5
     ):
         """Poll server untill model is loaded or timeout"""
         start_time = asyncio.get_event_loop().time()
 
-        while asyncio.get_event_loop().time - start_time < timeout:
+        while asyncio.get_event_loop().time() - start_time < timeout:
             status = await self.get_status(server_url)
 
             if status == ModelStatus.LOADED:

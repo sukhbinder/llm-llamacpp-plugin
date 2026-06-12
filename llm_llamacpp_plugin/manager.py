@@ -227,6 +227,8 @@ class ModelManager:
                     cache_data = json.load(f)
                     self.models = {}
                     for model_id, model_data in cache_data.items():
+                        if not isinstance(model_data, dict):
+                            continue
                         status_value = model_data.get("status", "UNLOADED")
                         self.models[model_id] = ServerModel(
                             id=model_data["id"],
@@ -239,6 +241,9 @@ class ModelManager:
                         )
                     self.current_model = cache_data.get("current_model")
             except (json.JSONDecodeError, IOError, KeyError, ValueError):
+                # If cache is corrupted, delete it
+                if cache_file.exists():
+                    cache_file.unlink()
                 pass
 
     def _save_cache(self) -> None:

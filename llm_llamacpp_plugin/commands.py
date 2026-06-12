@@ -108,7 +108,7 @@ def status():
 
     async def check_health():
         try:
-            async with http.AsyncClient() as client:
+            async with httpx.AsyncClient() as client:
                 response = await client.get(f"{manager.server_url}/health", timeout=5.0)
                 return response.status_code == 200
         except:

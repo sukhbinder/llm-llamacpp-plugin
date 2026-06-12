@@ -3,11 +3,12 @@ Model manager for llm-llamacpp-plugin.
 Handles model discovery, status tracking, and operations.
 """
 
-import os
 import json
+import os
 from pathlib import Path
-from typing import Optional, Dict, List
-from .models import ServerModel, ModelStatus, ServerMode
+from typing import Dict, List, Optional
+
+from .models import ModelStatus, ServerMode, ServerModel
 
 
 def get_cache_path() -> Path:
@@ -57,7 +58,7 @@ def get_api_keys() -> Optional[str]:
 class ModelManager:
     """Central manager for all model operations."""
 
-    def __init_(self, server_url: str = None):
+    def __init__(self, server_url: str = None):
         self.server_url = server_url or get_server_url()
         self.models: Dict[str, ServerModel] = {}
         self.current_model: Optional[str] = None
@@ -70,7 +71,7 @@ class ModelManager:
         try:
             import httpx
 
-            async with httpx.AsyncClient as client:
+            async with httpx.AsyncClient() as client:
                 # Check of server supports load/unload (router mode)
                 health_response = await client.get(
                     f"{self.server_url}/health", timeout=5.0
@@ -94,7 +95,7 @@ class ModelManager:
                 # Detect router mode from modes response
                 if self.mode == ServerMode.SINGLE and models_data:
                     first_model = (
-                        models.data[0] if isinstance(models_data, list) else None
+                        models_data[0] if isinstance(models_data, list) else None
                     )
                     if first_model and "status" in first_model:
                         self.mode = ServerMode.ROUTER
@@ -149,6 +150,10 @@ class ModelManager:
         """Get currently active model"""
         if self.current_model and self.current_model in self.models:
             return self.models[self.current_model]
+        # In single mode, if current_model is not explicitly set,
+        # the first discovered model is considered the current one.
+        if self.mode == ServerMode.SINGLE and self.models:
+            return next(iter(self.models.values()))
         return None
 
     async def load_model(self, model_id: str) -> bool:
@@ -192,10 +197,10 @@ class ModelManager:
             status = await self.models[model_id].get_status(self.server_url)
             if status in [ModelStatus.LOADED, ModelStatus.SLEEPING]:
                 self.current_model = model_id
-                self.model[model_id].status = status
+                self.models[model_id].status = status
                 self._save_cache()
                 return True
-        return await self.load_model(modell_id)
+        return await self.load_model(model_id)
 
     async def get_model_status(self, model_id: str) -> Optional[ModelStatus]:
         """Get the status of a specific model"""
@@ -232,6 +237,7 @@ class ModelManager:
                             status=ModelStatus(status_value),
                             port=model_data.get("port"),
                         )
+                    self.current_model = cache_data.get("current_model")
             except (json.JSONDecodeError, IOError, KeyError, ValueError):
                 pass
 
@@ -244,10 +250,11 @@ class ModelManager:
                 "id": model.id,
                 "name": model.name,
                 "context_size": model.context_size,
-                "mode": model.mode,
-                "status": model.status,
+                "mode": model.mode.value,
+                "status": model.status.value,
                 "port": model.port,
             }
+        cache_data["current_model"] = self.current_model
         with open(cache_file, "w") as f:
             json.dump(cache_data, f, indent=2)
 

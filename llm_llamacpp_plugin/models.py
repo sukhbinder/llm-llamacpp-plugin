@@ -185,7 +185,7 @@ class ServerModel:
 
     def get_label(self) -> str:
         """Get a formatted label with status"""
-        return f"[{self.status.value}] self.name"
+        return f"[{self.status.value}] {self.name}"
 
     def get_info(self) -> str:
         """Get human readable model information"""

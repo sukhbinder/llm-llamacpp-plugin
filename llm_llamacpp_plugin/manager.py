@@ -113,8 +113,8 @@ class ModelManager:
                         args = raw_status.get("args", [])
                         if args and isinstance(args, list):
                             # find port in args list format --port <port-number>
-                            for i, args in enumerate(args):
-                                if args == "--port" and i + 1 < len(args):
+                            for i, arg_item in enumerate(args):
+                                if arg_item == "--port" and i + 1 < len(args):
                                     try:
                                         port = int(args[i + 1])
                                     except ValueError:
@@ -124,9 +124,12 @@ class ModelManager:
 
                     model = ServerModel(
                         id=model_id,
-                        name=model_data.get("aliases", [model_id])[0]
-                        if model_data.get("aliases")
-                        else model_id,
+                        name=model_data.get("name")
+                        or (
+                            model_data.get("aliases", [model_id])[0]
+                            if model_data.get("aliases")
+                            else model_id
+                        ),
                         context_size=self._detect_context_size(model_data),
                         capabilities=model_data.get("architecture", {}),
                         mode=self.mode,
@@ -193,7 +196,7 @@ class ModelManager:
 
     async def switch_models(self, model_id: str) -> bool:
         """Switch to a different model"""
-        if model_id in self.models():
+        if model_id in self.models:
             status = await self.models[model_id].get_status(self.server_url)
             if status in [ModelStatus.LOADED, ModelStatus.SLEEPING]:
                 self.current_model = model_id

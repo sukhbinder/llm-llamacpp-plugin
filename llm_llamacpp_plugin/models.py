@@ -35,7 +35,7 @@ class ServerModel:
     name: str
     status: ModelStatus = ModelStatus.UNLOADED
     context_size: int = 128000
-    capabilities: Dict[str, Any] = field(default=dict)
+    capabilities: Dict[str, Any] = field(default_factory=dict)
     mode: ServerMode = ServerMode.SINGLE
 
     # Dynamic fields

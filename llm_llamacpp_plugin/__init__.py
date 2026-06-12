@@ -1,7 +1,13 @@
-import llm
-from llm.default_plugins.openai_models import Chat, AsyncChat
-import click
+"""
+llm-llamacpp-plugin - llm plugin for llamacpp server models.
+
+This plugin provides dynamic model discovery , loading and manament
+for llama.cpp servers running on both single-model and router modes.
+"""
+
 import httpx
+import llm
+from llm.default_plugins.openai_models import AsyncChat, Chat
 
 DEFAULT_SERVER_URL = "http://localhost:8080"
 
@@ -155,11 +161,7 @@ def register_embedding_models(register):
 
 @llm.hookimpl
 def register_commands(cli):
-    @cli.group()
-    def llamacpp():
-        "Commands relating to the llm-llamacpp plugin"
+    """Register CLI commands for model management."""
+    from llm_llamacpp_plugin.commands import llamacpp
 
-    @llamacpp.command()
-    def server():
-        "Print the current llama.cpp server URL"
-        click.echo(get_server_url())
+    cli.add_command(llamacpp)

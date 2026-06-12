@@ -18,7 +18,9 @@ llm install llm-llamacpp-plugin
 
 ## Setup
 
-First, you need to have a llama.cpp server running. You can start one using the llama.cpp server binary:
+### Building the Server
+
+First, you need to have a llama.cpp server running. You can start one using the built server binary:
 
 ```bash
 # Download and build llama.cpp if you haven't already
@@ -58,6 +60,61 @@ in windows
 setx LLM_LLAMACPP_SERVER http://your-server:port
 ```
 
+### Model Management (Router Mode)
+
+The plugin supports both single-model mode and router mode, where you can dynamically load, unload, and switch between models.
+
+llama-server can serve [multiple models with router mode](https://github.com/ggml-org/llama.cpp/blob/ebc10770ac5a9331824c53ef0c6adad780904dc3/tools/server/README.md#using-multiple-models). 
+
+#### CLI Commands
+
+Use the `llm llamacpp` command to manage models:
+
+```bash
+# List available models
+llm llamacpp list
+
+# Load a specific model
+llm llamacpp load <model-id>
+
+# Unload a model
+llm llamacpp unload <model-id>
+
+# Switch to a different model
+llm llamacpp switch <model-id>
+
+# Show model information
+llm llamacpp info <model-id>
+```
+
+#### Using Multiple Models
+
+In router mode, you can switch between models dynamically:
+
+```bash
+# Load model 1
+llm llamacpp load model1
+
+# Use it
+llm -m llamacpp "Your prompt here"
+
+# Switch to model 2
+llm llamacpp switch model2
+
+# Use it
+llm -m llamacpp "Your prompt here"
+```
+
+#### Per-Project Configuration
+
+You can configure the server URL per project using `.llm/llama-server.json`:
+
+```json
+{
+  "url": "http://your-server:port"
+}
+```
+
 ### Conversations
 
 You can use conversations just like with other models:
@@ -89,7 +146,7 @@ The plugin also supports embedding models running on llama.cpp server. To use em
 
 ```bash
 # Start the server with embedding support
-./llama-server -m models/embedding-model.gguf --embedding
+./build/bin/server -m models/embedding-model.gguf --embedding
 ```
 
 Then use it with LLM:

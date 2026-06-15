@@ -6,6 +6,7 @@ Provides models management commands.
 import click
 from .manager import ModelManager, get_server_url
 import asyncio
+import httpx
 
 
 @click.group()
@@ -53,8 +54,6 @@ def load(model_id: str):
     click.echo(f"Loading model: {model_id}")
     click.echo(f"Server: {manager.server_url}")
 
-    import asyncio
-
     async def do_load():
         success = await manager.load_model(model_id)
         return success
@@ -80,8 +79,6 @@ def switch(model_id: str):
     click.echo(f"Switching to model: {model_id}")
     click.echo(f"Server: {manager.server_url}")
 
-    import asyncio
-
     async def do_switch():
         success = await manager.switch_models(model_id)
         return success
@@ -103,8 +100,6 @@ def unload(model_id: str):
     click.echo(f"Unloading model: {model_id}")
     click.echo(f"Server: {manager.server_url}")
 
-    import asyncio
-
     async def do_unload():
         success = await manager.unload_model(model_id)
         return success
@@ -125,43 +120,45 @@ def status():
     click.echo(f"Server URL: {manager.server_url}")
     click.echo("-" * 60)
 
-    # Check Server Health
-    import asyncio
-    import httpx
-
-    async def check_health():
+    async def get_status_data():
+        # Check Server Health
+        is_healthy = False
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(f"{manager.server_url}/health", timeout=5.0)
-                return response.status_code == 200
-        except:
-            return False
+                is_healthy = response.status_code == 200
+        except httpx.RequestError:
+            is_healthy = False
 
-    is_healthy = asyncio.run(check_health())
+        if is_healthy:
+            click.echo(f"[OK] Server is healthy")
+        else:
+            click.echo(f"[ERROR] Server is not reachable", err=True)
+            return # Exit if server is not healthy, no point in checking models
 
-    if is_healthy:
-        click.echo(f"[OK] Server is healthy")
-    else:
-        click.echo(f"[ERROR] Server is not reachable", err=True)
+        # Show current model
+        current = await manager.get_current_model()
+        if current:
+            current_model_status = await current.get_status(manager.server_url)
+            click.echo(f"\nCurrent model: {current.name} ({current.id})")
+            click.echo(f"Status: {current_model_status.value}")
+        else:
+            click.echo("\nNo models currently loaded")
 
-    # Show current model
-    current = asyncio.get_event_loop().run_until_complete(manager.get_current_model())
-    if current:
-        live_status = asyncio.get_event_loop().run_until_complete(current.get_status(manager.server_url))
-        click.echo(f"\nCurrent model: {current.name} ({current.id})")
-        click.echo(f"Status: {live_status.value}")
-    else:
-        click.echo("\nNo models currently loaded")
+        # Show all models with status
+        click.echo("\nAll models:")
+        models = manager.list_models()
+        if not models:
+            click.echo("   (no models discovered)")
+        else:
+            # Parallelize fetching status for all models
+            tasks = [model.get_status(manager.server_url) for model in models]
+            all_model_statuses = await asyncio.gather(*tasks)
 
-    # Show all models with status
-    click.echo("\nAll models:")
-    models = manager.list_models()
-    if not models:
-        click.echo("   (no models discovered)")
-    else:
-        for model in models:
-            live_status = asyncio.get_event_loop().run_until_complete(model.get_status(manager.server_url))
-            click.echo(f"  [{live_status.value}] {model.name}")
+            for model, live_status in zip(models, all_model_statuses):
+                click.echo(f"  [{live_status.value}] {model.name}")
+
+    asyncio.run(get_status_data())
 
 
 @llamacpp.command()
@@ -173,7 +170,7 @@ def info(model_id: str):
     # Discover models if needed
     if model_id not in manager.models:
         click.echo(f"Discovering models...")
-        models = asyncio.get_event_loop().run_until_complete(manager.discover_models())
+        models = asyncio.run(manager.discover_models())
         if model_id not in manager.models:
             click.echo(f"[ERROR] Model '{model_id}' not found", err=True)
             click.echo(f"Available models: {', '.join(m.id for m in models)}")
@@ -183,7 +180,7 @@ def info(model_id: str):
     info_text = model.get_info()
 
     # Add current status
-    status = asyncio.get_event_loop().run_until_complete(
+    status = asyncio.run(
         model.get_status(manager.server_url)
     )
     info_text += f"Current Status: {status.value}\n"
@@ -202,13 +199,11 @@ def discover():
 
     click.echo(f"Discovering models from {manager.server_url}...")
 
-    import asyncio
-
     async def do_discover():
         models = await manager.discover_models()
         return len(models)
 
-    count = asyncio.get_event_loop().run_until_complete(do_discover())
+    count = asyncio.run(do_discover())
 
     if count > 0:
         click.echo(f"[OK] Discovered {count} model(s)")
@@ -216,3 +211,4 @@ def discover():
             click.echo(f"   - {model.id}: {model.name}")
     else:
         click.echo("[ERROR] No models discovered", err=True)
+        sys.exit(1)

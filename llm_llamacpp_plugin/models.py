@@ -42,7 +42,6 @@ class ServerModel:
     # Dynamic fields
     is_loaded: bool = False
     last_error: Optional[str] = None
-    _server_url: str = ""
     port: Optional[int] = None
     _raw_status: Optional[Dict[str, Any]] = None
 
@@ -54,7 +53,6 @@ class ServerModel:
             self.is_loaded = True
             return True
 
-        self._server_url = server_url
         self.status = ModelStatus.LOADING
         self.is_loaded = False
 
@@ -79,7 +77,6 @@ class ServerModel:
         if self.mode == ServerMode.SINGLE:
             return True
 
-        self._server_url = server_url
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
@@ -97,9 +94,6 @@ class ServerModel:
 
     async def get_status(self, server_url: str) -> ModelStatus:
         """Poll Server current status"""
-        self._server_url = server_url
-
-        # In single mode, models from /models are considered loaded.
         if self.mode == ServerMode.SINGLE:
             try:
                 async with httpx.AsyncClient() as client:
@@ -196,8 +190,7 @@ class ServerModel:
 
     def get_info(self) -> str:
         """Get human readable model information"""
-        return f"""
-ID           : {self.id}
+        return f"""ID           : {self.id}
 Model        : {self.name}
 Capabilities : {self.capabilities.get('input_modalities',['text'])}
 Context size : {self.context_size}

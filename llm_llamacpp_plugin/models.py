@@ -8,6 +8,7 @@ from enum import Enum
 from typing import Optional, Dict, Any, List
 import asyncio
 import httpx
+import json
 
 
 class ModelStatus(Enum):
@@ -98,7 +99,7 @@ class ServerModel:
         """Poll Server current status"""
         self._server_url = server_url
 
-        # In single model, models from /models are considered loaded.
+        # In single mode, models from /models are considered loaded.
         if self.mode == ServerMode.SINGLE:
             try:
                 async with httpx.AsyncClient() as client:
@@ -118,7 +119,7 @@ class ServerModel:
 
         try:
             async with httpx.AsyncClient() as client:
-                # try /props endpoint for detailes status
+                # try /props endpoint for details status
                 response = await client.get(
                     f"{server_url}/props?model={self.id}&autoload=false", timeout=5.0
                 )
@@ -167,7 +168,7 @@ class ServerModel:
     async def poll_status(
         self, server_url: str, timeout: int = 60, interval: float = 0.5
     ):
-        """Poll server untill model is loaded or timeout"""
+        """Poll server until model is loaded or timeout"""
         start_time = asyncio.get_event_loop().time()
 
         while asyncio.get_event_loop().time() - start_time < timeout:

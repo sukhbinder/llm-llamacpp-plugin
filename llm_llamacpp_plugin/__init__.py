@@ -1,7 +1,7 @@
 """
 llm-llamacpp-plugin - llm plugin for llamacpp server models.
 
-This plugin provides dynamic model discovery , loading and manament
+This plugin provides dynamic model discovery, loading and management
 for llama.cpp servers running on both single-model and router modes.
 """
 

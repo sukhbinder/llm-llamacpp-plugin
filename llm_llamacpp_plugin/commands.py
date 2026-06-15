@@ -59,7 +59,7 @@ def load(model_id: str):
         success = await manager.load_model(model_id)
         return success
 
-    success = asyncio.get_event_loop().run_until_complete(do_load())
+    success = asyncio.run(do_load())
 
     if success:
         click.echo(f"[OK] Model '{model_id}' loaded successfully!")
@@ -69,6 +69,29 @@ def load(model_id: str):
         model = manager.models.get(model_id)
         if model and model.last_error:
             click.echo(f"Error: {model.last_error}")
+
+
+@llamacpp.command()
+@click.argument("model_id")
+def switch(model_id: str):
+    """Switch to a different model"""
+    manager = ModelManager()
+
+    click.echo(f"Switching to model: {model_id}")
+    click.echo(f"Server: {manager.server_url}")
+
+    import asyncio
+
+    async def do_switch():
+        success = await manager.switch_models(model_id)
+        return success
+
+    success = asyncio.run(do_switch())
+
+    if success:
+        click.echo(f"[OK] Switched to model '{model_id}'")
+    else:
+        click.echo(f"[ERROR] Failed to switch model '{model_id}'", err=True)
 
 
 @llamacpp.command()
@@ -86,12 +109,12 @@ def unload(model_id: str):
         success = await manager.unload_model(model_id)
         return success
 
-    success = asyncio.get_event_loop().run_until_complete(do_unload())
+    success = asyncio.run(do_unload())
 
     if success:
-        click.echo(f"[OK] Switched to model '{model_id}'")
+        click.echo(f"[OK] Model '{model_id}' unloaded successfully!")
     else:
-        click.echo(f"[ERROR] Failed to switch model '{model_id}'", err=True)
+        click.echo(f"[ERROR] Failed to unload model '{model_id}'", err=True)
 
 
 @llamacpp.command()
@@ -114,7 +137,7 @@ def status():
         except:
             return False
 
-    is_healthy = asyncio.get_event_loop().run_until_complete(check_health())
+    is_healthy = asyncio.run(check_health())
 
     if is_healthy:
         click.echo(f"[OK] Server is healthy")

@@ -12,7 +12,7 @@ from .models import ModelStatus, ServerMode, ServerModel
 
 
 def get_cache_path() -> Path:
-    """Get the cahce file path for model data."""
+    """Get the cache file path for model data."""
     # Use user cache directory
     cache_dir = Path.home() / ".llm" / "llamacpp"
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -41,7 +41,7 @@ def get_server_url(project_dir: str = None) -> str:
             except (json.JSONDecodeError, IOError):
                 pass
 
-    # Check enviornment varianle
+    # Check environment variable
     env_url = os.environ.get("LLM_LLAMACPP_SERVER")
     if env_url:
         return env_url
@@ -89,7 +89,7 @@ class ModelManager:
                 response.raise_for_status()
                 data = response.json()
 
-                # Handle differnet response format
+                # Handle different response format
                 models_data = data.get("data") or data.get("models", [])
 
                 # Detect router mode from modes response
@@ -102,7 +102,7 @@ class ModelManager:
 
                 self.models = {}
                 for model_data in models_data:
-                    model_id = model_data.get("id") or model_data("name")
+                    model_id = model_data.get("id") or model_data.get("name")
                     if not model_id:
                         continue
 
@@ -136,7 +136,7 @@ class ModelManager:
                         port=port,
                         _raw_status=raw_status,
                     )
-                    # In single mode, model are loaded by default
+                    # In single mode, models are loaded by default
                     if self.mode == ServerMode.SINGLE:
                         model.status = ModelStatus.LOADED
                     self.models[model_id] = model

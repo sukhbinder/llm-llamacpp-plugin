@@ -4,6 +4,7 @@ Provides models management commands.
 """
 
 import click
+import sys
 from .manager import ModelManager, get_server_url
 import asyncio
 import httpx
